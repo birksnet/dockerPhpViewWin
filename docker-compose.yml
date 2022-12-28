@@ -1,0 +1,96 @@
+# Felipe Birk - BRT Containers
+version: "3" 
+services:
+
+      backend:
+          image: php:${PHP_VERSION}
+          working_dir: /var/www/backend/
+          tty: true
+          links:
+            - mysql
+            - api_service
+          environment:
+            - GIT_USER=${GIT_USER}
+            - GIT_PASS=${GIT_PASS}
+          command: >
+              bash -c "
+                apt update && apt install -y unzip git vim 
+                apt install -y libsodium-dev
+                apt-get update -y && apt install -y mariadb-client
+                docker-php-ext-install sodium mysqli pdo pdo_mysql
+                curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                git clone -b ${GIT_BRANCH} https://${GIT_USER}:${GIT_PASS}@${GIT_URL} .
+                composer install --ignore-platform-reqs
+                cd /var/www/backend/ && php artisan serve --host=0.0.0.0 --port=8000 &
+                tail -f > /dev/null
+              "
+          volumes:
+            - "./src/backend/:/var/www/backend/"
+          #  - "./.env:/var/www/.env"
+          ports:
+          - 8090:8000
+         
+      api_service:
+          image: php:${PHP_VERSION}
+          working_dir: /var/www/service/
+          tty: true
+          links:
+            - mysql
+          command: >
+              bash -c "
+                apt update && apt install -y unzip git vim 
+                apt install -y libsodium-dev
+                apt-get update -y && apt install -y mariadb-client
+                docker-php-ext-install sodium mysqli pdo pdo_mysql
+                curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                composer install --ignore-platform-reqs
+                cd /var/www/service/ && php artisan serve --host=0.0.0.0 --port=8000 &
+                tail -f > /dev/null
+              "
+          volumes:
+            - "./src/service/:/var/www/service/"
+          #  - "./.env:/var/www/.env"
+          ports:
+          - 8091:8000
+
+      frontend:        
+          image: node:12
+          restart: always
+          working_dir: /var/www/frontend/
+          tty: true
+          environment:
+            - NODE_ENV=development
+          command: >
+              bash -c "
+                apt update && apt install -y unzip git vim 
+                git config --global user.email ${GIT_USER}@example.com
+                git config --global user.name ${GIT_USER}
+                git clone -b ${GIT_BRANCH} https://${GIT_USER}:${GIT_PASS}@${GIT_URL} .
+                npm install
+                npm install --save-dev less
+                npm install --save-dev nuxt-vuex-localstorage
+                npm install --save-dev file-loader
+                npm run dev &
+                tail -f /dev/null
+              "
+          volumes:
+            - "./src/frontend:/var/www/frontend"
+            - "./src/frontend/node_modules:/var/www/frontend/node_modules"
+          ports:
+            - 8080:3000
+  
+      mysql:
+          image: mysql
+          environment:
+            MYSQL_ROOT_PASSWORD: "Mudar123"
+            MYSQL_USER: "admin"
+            MYSQL_PASSWORD: "Mudar123"
+            MYSQL_DATABASE: "PortalV2Test"
+          command: --default-authentication-plugin=mysql_native_password
+          volumes:
+            - ./database/mysql:/var/lib/mysql
+            - ./database/schema:/var/schema
+
+
+          ports:
+            - 3306:3306    
